@@ -1,8 +1,8 @@
 {
   "name": "method-markers",
   "displayName": "Method Markers",
-  "description": "Adds scan-friendly method markers to Java files.",
-  "version": "1.0.0",
+  "description": "Adds scan-friendly method markers to supported source files.",
+  "version": "1.1.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/PRANEETH2611/Method-Marker.git"
@@ -15,6 +15,20 @@
   ],
   "activationEvents": [
     "onLanguage:java",
+    "onLanguage:javascript",
+    "onLanguage:typescript",
+    "onLanguage:javascriptreact",
+    "onLanguage:typescriptreact",
+    "onLanguage:c",
+    "onLanguage:cpp",
+    "onLanguage:csharp",
+    "onLanguage:go",
+    "onLanguage:rust",
+    "onLanguage:kotlin",
+    "onLanguage:php",
+    "onLanguage:python",
+    "onLanguage:ruby",
+    "onLanguage:shellscript",
     "onCommand:method-markers.markMethods"
   ],
   "main": "./out/extension.js",

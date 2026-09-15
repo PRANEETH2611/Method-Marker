@@ -1,6 +1,6 @@
 # Method Markers
 
-Method Markers makes long Java classes easier to scan by placing a compact marker directly above every method and constructor.
+Method Markers makes source files easier to scan by placing a compact marker directly above every detected function, method, or constructor.
 
 It runs locally inside VS Code. It does not use AI, API keys, external services, or network requests.
 
@@ -45,11 +45,27 @@ public class DocumentService {
 }
 ```
 
+Python uses `#` markers:
+
+```python
+# ===== upload_document =====
+def upload_document():
+    pass
+```
+
+JavaScript and TypeScript use `//` markers:
+
+```javascript
+// ===== fetchUser =====
+async function fetchUser() {
+}
+```
+
 ## Use
 
 ### Automatically on Save
 
-Open a Java file and save it with `Ctrl+S` (or `Cmd+S` on macOS). Method Markers finds Java method and constructor symbols, then adds any missing markers.
+Open a supported source file and save it with `Ctrl+S` (or `Cmd+S` on macOS). Method Markers finds callable document symbols, then adds any missing markers.
 
 ### Manually
 
@@ -63,16 +79,17 @@ The command processes the active editor only.
 
 ## Behavior and Safety
 
-- Supports Java files only.
-- Uses VS Code's built-in document-symbol provider to identify methods and constructors.
-- Handles multiple methods, overloaded methods, and constructors.
+- Supports Java, JavaScript, TypeScript, JavaScript React, TypeScript React, C, C++, C#, Go, Rust, Kotlin, PHP, Python, Ruby, and Shell Script.
+- Uses VS Code's built-in document-symbol provider to identify functions, methods, and constructors.
+- Uses `//` markers for Java, JavaScript, TypeScript, React variants, C, C++, C#, Go, Rust, Kotlin, and PHP; uses `#` markers for Python, Ruby, and Shell Script.
+- Handles multiple functions, overloaded methods, nested symbols, and constructors reported by the language provider.
 - Uses a single VS Code `WorkspaceEdit` for all markers found during a run.
 - Checks for the expected marker immediately above each declaration before inserting it, including when the Java language provider includes comments in a symbol range.
 - Preserves user comments, source code, imports, method names, and formatting. Generated comments inherit the declaration's indentation.
-- Does nothing when a Java document has no method symbols or when the active document is not Java.
+- Does nothing when a supported document has no callable symbols or when the active document uses an unsupported language.
 - Never removes existing comments, including markers produced by an earlier version of the extension.
 
-For method detection, VS Code needs Java language support to be active, such as the Java Extension Pack or another extension that provides Java document symbols.
+For detection, VS Code needs language support that provides document symbols for the file you are editing. Install and enable the relevant language extension where VS Code does not provide that support itself.
 
 ## Run Locally During Development
 
@@ -84,7 +101,7 @@ For method detection, VS Code needs Java language support to be active, such as 
    ```
 
 3. Press `F5` to start an Extension Development Host.
-4. In that new VS Code window, open a Java file and save it.
+4. In that new VS Code window, open a supported source file and save it.
 
 ## Development Commands
 
@@ -99,7 +116,7 @@ npm test
 ## Requirements
 
 - VS Code 1.85 or later
-- Java language support that provides document symbols
+- Language support that provides document symbols for the source language being marked
 
 ## License
 

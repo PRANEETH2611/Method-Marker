@@ -1,12 +1,40 @@
 import * as vscode from 'vscode';
 
-const markerFor = (name: string): string => `// ===== ${name} =====`;
+interface LanguageConfig {
+    readonly commentPrefix: '//' | '#';
+}
+
+export const supportedLanguages: Readonly<Record<string, LanguageConfig>> = {
+    java: { commentPrefix: '//' },
+    javascript: { commentPrefix: '//' },
+    typescript: { commentPrefix: '//' },
+    javascriptreact: { commentPrefix: '//' },
+    typescriptreact: { commentPrefix: '//' },
+    c: { commentPrefix: '//' },
+    cpp: { commentPrefix: '//' },
+    csharp: { commentPrefix: '//' },
+    go: { commentPrefix: '//' },
+    rust: { commentPrefix: '//' },
+    kotlin: { commentPrefix: '//' },
+    php: { commentPrefix: '//' },
+    python: { commentPrefix: '#' },
+    ruby: { commentPrefix: '#' },
+    shellscript: { commentPrefix: '#' },
+};
+
+function markerFor(name: string, config: LanguageConfig): string {
+    return `${config.commentPrefix} ===== ${name} =====`;
+}
 
 function collectMethodSymbols(symbols: readonly vscode.DocumentSymbol[]): vscode.DocumentSymbol[] {
     const methods: vscode.DocumentSymbol[] = [];
 
     for (const symbol of symbols) {
-        if (symbol.kind === vscode.SymbolKind.Method || symbol.kind === vscode.SymbolKind.Constructor) {
+        if (
+            symbol.kind === vscode.SymbolKind.Method ||
+            symbol.kind === vscode.SymbolKind.Function ||
+            symbol.kind === vscode.SymbolKind.Constructor
+        ) {
             methods.push(symbol);
         }
         methods.push(...collectMethodSymbols(symbol.children));
@@ -15,7 +43,11 @@ function collectMethodSymbols(symbols: readonly vscode.DocumentSymbol[]): vscode
     return methods;
 }
 
-function declarationLine(document: vscode.TextDocument, method: vscode.DocumentSymbol): number {
+function declarationLine(
+    document: vscode.TextDocument,
+    method: vscode.DocumentSymbol,
+    config: LanguageConfig,
+): number {
     let inBlockComment = false;
     const lastLine = Math.min(method.selectionRange.start.line, method.range.end.line);
 
@@ -25,10 +57,10 @@ function declarationLine(document: vscode.TextDocument, method: vscode.DocumentS
             inBlockComment = !text.includes('*/');
             continue;
         }
-        if (!text || text.startsWith('//')) {
+        if (!text || text.startsWith(config.commentPrefix)) {
             continue;
         }
-        if (text.startsWith('/*')) {
+        if (config.commentPrefix === '//' && text.startsWith('/*')) {
             inBlockComment = !text.includes('*/');
             continue;
         }
@@ -39,7 +71,8 @@ function declarationLine(document: vscode.TextDocument, method: vscode.DocumentS
 }
 
 export async function markMethods(document: vscode.TextDocument): Promise<boolean> {
-    if (document.languageId !== 'java') {
+    const config = supportedLanguages[document.languageId];
+    if (!config) {
         return false;
     }
 
@@ -53,13 +86,9 @@ export async function markMethods(document: vscode.TextDocument): Promise<boolea
 
     const edit = new vscode.WorkspaceEdit();
     for (const method of collectMethodSymbols(symbols)) {
-        const methodLine = declarationLine(document, method);
-        if (methodLine === 0) {
-            continue;
-        }
-
-        const marker = markerFor(method.name);
-        const precedingLine = document.lineAt(methodLine - 1).text.trim();
+        const methodLine = declarationLine(document, method, config);
+        const marker = markerFor(method.name, config);
+        const precedingLine = methodLine > 0 ? document.lineAt(methodLine - 1).text.trim() : '';
         if (precedingLine !== marker) {
             const indentation = document.lineAt(methodLine).text.match(/^\s*/)?.[0] ?? '';
             edit.insert(document.uri, new vscode.Position(methodLine, 0), `${indentation}${marker}\n`);

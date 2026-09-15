@@ -1,32 +1,51 @@
 import * as assert from 'assert';
 import * as vscode from 'vscode';
-import { markMethods } from '../methodMarkerProvider';
+import { markMethods, supportedLanguages } from '../methodMarkerProvider';
 
-async function javaDocument(contents: string): Promise<vscode.TextDocument> {
-    return vscode.workspace.openTextDocument({ language: 'java', content: contents });
+async function documentFor(language: string, contents: string): Promise<vscode.TextDocument> {
+    return vscode.workspace.openTextDocument({ language, content: contents });
+}
+
+function markerFor(language: string, name: string): string {
+    return `${supportedLanguages[language].commentPrefix} ===== ${name} =====`;
 }
 
 suite('Method Markers', () => {
     let symbolProvider: vscode.Disposable;
 
     setup(() => {
-        symbolProvider = vscode.languages.registerDocumentSymbolProvider('java', {
+        symbolProvider = vscode.languages.registerDocumentSymbolProvider(Object.keys(supportedLanguages), {
             provideDocumentSymbols(document) {
-                const className = document.getText().match(/class\s+(\w+)/)?.[1] ?? '';
                 const symbols: vscode.DocumentSymbol[] = [];
-                const declaration = /^\s*(?:public|protected|private)?\s*(?:static\s+)?(?:[\w<>, ?]+\s+)?(\w+)\s*\([^;]*\)\s*{/;
+                const classSymbols: vscode.DocumentSymbol[] = [];
 
                 for (let line = 0; line < document.lineCount; line += 1) {
-                    const name = document.lineAt(line).text.match(declaration)?.[1];
-                    if (!name || name === 'if' || name === 'for' || name === 'while') {
+                    const text = document.lineAt(line).text;
+                    const match = text.match(/symbol:(\w+)(?::(constructor|nested))?/);
+                    if (!match) {
                         continue;
                     }
-                    const markerLine = line > 0 && document.lineAt(line - 1).text.trim() === `// ===== ${name} =====`;
-                    const rangeStart = markerLine ? line - 1 : line;
-                    const range = new vscode.Range(rangeStart, 0, line, document.lineAt(line).text.length);
-                    const selectionRange = new vscode.Range(line, 0, line, document.lineAt(line).text.length);
-                    const kind = name === className ? vscode.SymbolKind.Constructor : vscode.SymbolKind.Method;
-                    symbols.push(new vscode.DocumentSymbol(name, '', kind, range, selectionRange));
+
+                    const name = match[1];
+                    const previousLine = line > 0 ? document.lineAt(line - 1).text.trim() : '';
+                    const rangeStart = previousLine === markerFor(document.languageId, name) ? line - 1 : line;
+                    const range = new vscode.Range(rangeStart, 0, line, text.length);
+                    const selectionRange = new vscode.Range(line, 0, line, text.length);
+                    const kind = match[2] === 'constructor' ? vscode.SymbolKind.Constructor : vscode.SymbolKind.Function;
+                    const symbol = new vscode.DocumentSymbol(name, '', kind, range, selectionRange);
+
+                    if (match[2] === 'nested') {
+                        classSymbols.push(symbol);
+                    } else {
+                        symbols.push(symbol);
+                    }
+                }
+
+                if (classSymbols.length > 0) {
+                    const range = new vscode.Range(0, 0, document.lineCount - 1, document.lineAt(document.lineCount - 1).text.length);
+                    const container = new vscode.DocumentSymbol('Container', '', vscode.SymbolKind.Class, range, range);
+                    container.children = classSymbols;
+                    symbols.push(container);
                 }
                 return symbols;
             },
@@ -35,28 +54,65 @@ suite('Method Markers', () => {
 
     teardown(() => symbolProvider.dispose());
 
-    test('adds markers for methods and constructors', async function () {
-        this.timeout(10000);
-        const document = await javaDocument([
+    test('marks Java methods, constructors, and overloads', async () => {
+        const document = await documentFor('java', [
             'public class Sample {',
-            '    public Sample() {}',
-            '    public void first() {}',
-            '    public void second(String value) {}',
+            '    public Sample() {} // symbol:Sample:constructor',
+            '    public void upload() {} // symbol:upload',
+            '    public void upload(String path) {} // symbol:upload',
             '}',
         ].join('\n'));
 
         await markMethods(document);
         assert.match(document.getText(), / {4}\/\/ ===== Sample =====\r?\n {4}public Sample/);
-        assert.match(document.getText(), / {4}\/\/ ===== first =====\r?\n {4}public void first/);
-        assert.match(document.getText(), / {4}\/\/ ===== second =====\r?\n {4}public void second/);
+        assert.strictEqual((document.getText().match(/===== upload =====/g) ?? []).length, 2);
     });
 
-    test('does not duplicate existing markers', async function () {
-        this.timeout(10000);
-        const document = await javaDocument([
+    test('uses hash markers for Python functions and nested class methods', async () => {
+        const document = await documentFor('python', [
+            'def upload_document(): # symbol:upload_document',
+            '    pass',
+            '',
+            'class Service:',
+            '    def create_user(self): # symbol:create_user:nested',
+            '        pass',
+        ].join('\n'));
+
+        await markMethods(document);
+        assert.match(document.getText(), /^# ===== upload_document =====\r?\ndef upload_document/m);
+        assert.match(document.getText(), / {4}# ===== create_user =====\r?\n {4}def create_user/);
+    });
+
+    test('marks JavaScript, TypeScript, and C functions with slash markers', async () => {
+        for (const [language, declaration, name] of [
+            ['javascript', 'function fetchUser() {}', 'fetchUser'],
+            ['typescript', 'async function loadUser(): Promise<void> {}', 'loadUser'],
+            ['c', 'int calculate_total(void) { return 0; }', 'calculate_total'],
+        ]) {
+            const document = await documentFor(language, `${declaration} // symbol:${name}`);
+            await markMethods(document);
+            assert.match(document.getText(), new RegExp(`^// ===== ${name} =====\\r?\\n`));
+        }
+    });
+
+    test('configures every supported language with the correct marker prefix', () => {
+        const hashCommentLanguages = ['python', 'ruby', 'shellscript'];
+        const expectedLanguages = [
+            'c', 'cpp', 'csharp', 'go', 'java', 'javascript', 'javascriptreact', 'kotlin', 'php',
+            'python', 'ruby', 'rust', 'shellscript', 'typescript', 'typescriptreact',
+        ];
+
+        assert.deepStrictEqual(Object.keys(supportedLanguages).sort(), expectedLanguages);
+        for (const [language, config] of Object.entries(supportedLanguages)) {
+            assert.strictEqual(config.commentPrefix, hashCommentLanguages.includes(language) ? '#' : '//', language);
+        }
+    });
+
+    test('does not duplicate markers when a symbol range includes the existing marker', async () => {
+        const document = await documentFor('java', [
             'public class Sample {',
             '    // ===== run =====',
-            '    public void run() {}',
+            '    public void run() {} // symbol:run',
             '}',
         ].join('\n'));
 
@@ -65,35 +121,28 @@ suite('Method Markers', () => {
         assert.strictEqual((document.getText().match(/===== run =====/g) ?? []).length, 1);
     });
 
-    test('marks every overloaded method', async function () {
-        this.timeout(10000);
-        const document = await javaDocument([
-            'public class Sample {',
-            '    public void upload() {}',
-            '    public void upload(String path) {}',
-            '}',
+    test('preserves existing user comments', async () => {
+        const document = await documentFor('python', [
+            '# A user comment',
+            'def calculate_total(): # symbol:calculate_total',
+            '    pass',
         ].join('\n'));
 
         await markMethods(document);
-        assert.strictEqual((document.getText().match(/===== upload =====/g) ?? []).length, 2);
+        assert.match(document.getText(), /# A user comment\r?\n# ===== calculate_total =====\r?\ndef calculate_total/);
     });
 
-    test('preserves an existing user comment', async function () {
-        this.timeout(10000);
-        const document = await javaDocument([
-            'public class Sample {',
-            '    // A user comment',
-            '    public void run() {}',
-            '}',
-        ].join('\n'));
-
+    test('is idempotent across repeated marker operations', async () => {
+        const document = await documentFor('typescript', 'function run() {} // symbol:run');
         await markMethods(document);
-        assert.match(document.getText(), /\/\/ A user comment\r?\n {4}\/\/ ===== run =====\r?\n {4}public void run/);
+        const onceMarked = document.getText();
+        await markMethods(document);
+        assert.strictEqual(document.getText(), onceMarked);
     });
 
-    test('ignores non-Java documents', async () => {
-        const document = await vscode.workspace.openTextDocument({ language: 'typescript', content: 'function run() {}' });
+    test('ignores unsupported languages', async () => {
+        const document = await documentFor('json', '{ "value": true }');
         assert.strictEqual(await markMethods(document), false);
-        assert.strictEqual(document.getText(), 'function run() {}');
+        assert.strictEqual(document.getText(), '{ "value": true }');
     });
 });
