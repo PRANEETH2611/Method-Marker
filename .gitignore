@@ -27,4 +27,3 @@ Thumbs.db
 !.env.example
 
 # VSIX packages
-*.vsix
