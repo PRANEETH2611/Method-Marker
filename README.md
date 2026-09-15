@@ -61,6 +61,21 @@ async function fetchUser() {
 }
 ```
 
+
+## Installation
+
+Download the latest `.vsix` file from the GitHub Releases section of this repository.
+
+In VS Code:
+
+1. Open Extensions with `Ctrl+Shift+X`.
+2. Click the `...` menu.
+3. Select **Install from VSIX...**
+4. Select the downloaded `.vsix` file.
+5. Reload VS Code if prompted.
+
+No Marketplace account or additional service is required.
+
 ## Use
 
 ### Automatically on Save
@@ -76,6 +91,23 @@ Method Markers: Mark Methods
 ```
 
 The command processes the active editor only.
+
+## Privacy
+
+Method Markers operates entirely inside VS Code.
+
+It does not:
+
+- Use AI
+- Send source code anywhere
+- Make network requests
+- Require API keys
+- Connect to external services
+- Collect telemetry
+
+Your source code stays on your machine.
+
+
 
 ## Behavior and Safety
 
