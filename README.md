@@ -57,9 +57,18 @@ JavaScript and TypeScript use `//` markers:
 
 ```javascript
 // ===== fetchUser =====
-async function fetchUser() {
-}
+async function fetchUser() {}
 ```
+
+## Before and After
+
+### Before
+
+![Before Method Markers](assets/before.png)
+
+### After
+
+![After Method Markers](assets/after.png)
 
 ## Use
 
@@ -121,4 +130,3 @@ npm test
 ## License
 
 MIT License
-
