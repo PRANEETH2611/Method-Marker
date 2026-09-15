@@ -3,10 +3,17 @@
   "displayName": "Method Markers",
   "description": "Adds scan-friendly method markers to supported source files.",
   "version": "1.1.0",
+  "publisher": "PRANEETH2611",
+  "license": "SEE LICENSE IN LICENSE",
   "repository": {
     "type": "git",
     "url": "https://github.com/PRANEETH2611/Method-Marker.git"
 },
+"bugs": {
+    "url": "https://github.com/PRANEETH2611/Method-Marker/issues"
+  },
+  "homepage": "https://github.com/PRANEETH2611/Method-Marker",
+  "icon": "icon.png",
   "engines": {
     "vscode": "^1.85.0"
   },

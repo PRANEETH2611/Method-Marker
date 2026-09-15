@@ -22,10 +22,12 @@ export const supportedLanguages: Readonly<Record<string, LanguageConfig>> = {
     shellscript: { commentPrefix: '#' },
 };
 
+// ===== markerFor =====
 function markerFor(name: string, config: LanguageConfig): string {
     return `${config.commentPrefix} ===== ${name} =====`;
 }
 
+// ===== collectMethodSymbols =====
 function collectMethodSymbols(symbols: readonly vscode.DocumentSymbol[]): vscode.DocumentSymbol[] {
     const methods: vscode.DocumentSymbol[] = [];
 
@@ -43,6 +45,7 @@ function collectMethodSymbols(symbols: readonly vscode.DocumentSymbol[]): vscode
     return methods;
 }
 
+// ===== declarationLine =====
 function declarationLine(
     document: vscode.TextDocument,
     method: vscode.DocumentSymbol,
@@ -70,6 +73,7 @@ function declarationLine(
     return method.range.start.line;
 }
 
+// ===== markMethods =====
 export async function markMethods(document: vscode.TextDocument): Promise<boolean> {
     const config = supportedLanguages[document.languageId];
     if (!config) {
