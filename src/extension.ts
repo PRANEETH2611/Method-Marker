@@ -3,21 +3,10 @@ import { markMethods } from './methodMarkerProvider';
 
 // ===== activate =====
 export function activate(context: vscode.ExtensionContext): void {
-    const processingDocuments = new Set<string>();
     context.subscriptions.push(
         // ===== vscode.workspace.onDidSaveTextDocument() callback =====
         vscode.workspace.onDidSaveTextDocument(async (document) => {
-            const key = document.uri.toString();
-            if (processingDocuments.has(key)) {
-                return;
-            }
-
-            processingDocuments.add(key);
-            try {
-                await markMethods(document);
-            } finally {
-                processingDocuments.delete(key);
-            }
+            await markMethods(document);
         }),
         // ===== vscode.commands.registerCommand('method-markers.markMethods') callback =====
         vscode.commands.registerCommand('method-markers.markMethods', async () => {

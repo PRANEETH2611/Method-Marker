@@ -21,7 +21,7 @@ suite('Method Markers', () => {
 
                 for (let line = 0; line < document.lineCount; line += 1) {
                     const text = document.lineAt(line).text;
-                    const match = text.match(/symbol:(\w+)(?::(constructor|nested))?/);
+                    const match = text.match(/symbol:(\w+)(?::(constructor|nested|duplicate))?/);
                     if (!match) {
                         continue;
                     }
@@ -38,6 +38,9 @@ suite('Method Markers', () => {
                         classSymbols.push(symbol);
                     } else {
                         symbols.push(symbol);
+                        if (match[2] === 'duplicate') {
+                            symbols.push(symbol);
+                        }
                     }
                 }
 
@@ -121,6 +124,26 @@ suite('Method Markers', () => {
         assert.strictEqual((document.getText().match(/===== run =====/g) ?? []).length, 1);
     });
 
+    test('does not repeat markers in a contiguous nested callback marker block', async () => {
+        const document = await documentFor('typescript', [
+            '// ===== outer =====',
+            '// ===== inner =====',
+            'describe("suite", () => {}); // symbol:outer',
+        ].join('\n'));
+
+        await markMethods(document);
+        assert.strictEqual((document.getText().match(/===== outer =====/g) ?? []).length, 1);
+        assert.strictEqual((document.getText().match(/===== inner =====/g) ?? []).length, 1);
+    });
+
+    test('adds one marker when the symbol provider returns a declaration twice', async () => {
+        const document = await documentFor('typescript', 'function run() {} // symbol:run:duplicate');
+
+        await markMethods(document);
+        await markMethods(document);
+        assert.strictEqual((document.getText().match(/===== run =====/g) ?? []).length, 1);
+    });
+
     test('preserves existing user comments', async () => {
         const document = await documentFor('python', [
             '# A user comment',
@@ -138,6 +161,13 @@ suite('Method Markers', () => {
         const onceMarked = document.getText();
         await markMethods(document);
         assert.strictEqual(document.getText(), onceMarked);
+    });
+
+    test('does not duplicate markers for overlapping operations', async () => {
+        const document = await documentFor('javascript', 'function run() {} // symbol:run');
+
+        await Promise.all([markMethods(document), markMethods(document)]);
+        assert.strictEqual((document.getText().match(/===== run =====/g) ?? []).length, 1);
     });
 
     test('ignores unsupported languages', async () => {

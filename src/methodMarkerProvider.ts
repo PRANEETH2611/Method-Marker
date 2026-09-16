@@ -22,6 +22,8 @@ export const supportedLanguages: Readonly<Record<string, LanguageConfig>> = {
     shellscript: { commentPrefix: '#' },
 };
 
+const processingDocuments = new Set<string>();
+
 // ===== markerFor =====
 function markerFor(name: string, config: LanguageConfig): string {
     return `${config.commentPrefix} ===== ${name} =====`;
@@ -73,6 +75,37 @@ function declarationLine(
     return method.range.start.line;
 }
 
+function isGeneratedMarker(text: string, config: LanguageConfig): boolean {
+    return text.startsWith(`${config.commentPrefix} ===== `) && text.endsWith(' =====');
+}
+
+function hasMarker(
+    document: vscode.TextDocument,
+    method: vscode.DocumentSymbol,
+    declarationLine: number,
+    marker: string,
+    config: LanguageConfig,
+): boolean {
+    for (let line = declarationLine - 1; line >= 0; line -= 1) {
+        const text = document.lineAt(line).text.trim();
+        if (!isGeneratedMarker(text, config)) {
+            break;
+        }
+        if (text === marker) {
+            return true;
+        }
+    }
+
+    const rangeEnd = Math.min(declarationLine - 1, method.range.end.line);
+    for (let line = method.range.start.line; line <= rangeEnd; line += 1) {
+        if (document.lineAt(line).text.trim() === marker) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 // ===== markMethods =====
 export async function markMethods(document: vscode.TextDocument): Promise<boolean> {
     const config = supportedLanguages[document.languageId];
@@ -80,24 +113,35 @@ export async function markMethods(document: vscode.TextDocument): Promise<boolea
         return false;
     }
 
-    const symbols = await vscode.commands.executeCommand<vscode.DocumentSymbol[]>(
-        'vscode.executeDocumentSymbolProvider',
-        document.uri,
-    );
-    if (!symbols?.length) {
+    const documentKey = document.uri.toString();
+    if (processingDocuments.has(documentKey)) {
         return false;
     }
 
-    const edit = new vscode.WorkspaceEdit();
-    for (const method of collectMethodSymbols(symbols)) {
-        const methodLine = declarationLine(document, method, config);
-        const marker = markerFor(method.name, config);
-        const precedingLine = methodLine > 0 ? document.lineAt(methodLine - 1).text.trim() : '';
-        if (precedingLine !== marker) {
-            const indentation = document.lineAt(methodLine).text.match(/^\s*/)?.[0] ?? '';
-            edit.insert(document.uri, new vscode.Position(methodLine, 0), `${indentation}${marker}\n`);
+    processingDocuments.add(documentKey);
+    try {
+        const symbols = await vscode.commands.executeCommand<vscode.DocumentSymbol[]>(
+            'vscode.executeDocumentSymbolProvider',
+            document.uri,
+        );
+        if (!symbols?.length) {
+            return false;
         }
-    }
 
-    return edit.size > 0 && vscode.workspace.applyEdit(edit);
+        const edit = new vscode.WorkspaceEdit();
+        const insertionLines = new Set<number>();
+        for (const method of collectMethodSymbols(symbols)) {
+            const methodLine = declarationLine(document, method, config);
+            const marker = markerFor(method.name, config);
+            if (!insertionLines.has(methodLine) && !hasMarker(document, method, methodLine, marker, config)) {
+                const indentation = document.lineAt(methodLine).text.match(/^\s*/)?.[0] ?? '';
+                edit.insert(document.uri, new vscode.Position(methodLine, 0), `${indentation}${marker}\n`);
+                insertionLines.add(methodLine);
+            }
+        }
+
+        return edit.size > 0 && vscode.workspace.applyEdit(edit);
+    } finally {
+        processingDocuments.delete(documentKey);
+    }
 }
