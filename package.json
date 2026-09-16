@@ -2,7 +2,7 @@
   "name": "method-markers",
   "displayName": "Method Markers",
   "description": "Adds scan-friendly method markers to supported source files.",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "publisher": "PRANEETH2611",
   "license": "SEE LICENSE IN LICENSE",
   "repository": {
