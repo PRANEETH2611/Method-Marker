@@ -73,6 +73,8 @@ async function fetchUser() {}
 ## Installation
 
 Download the latest `.vsix` file from the GitHub Releases section of this repository.
+###Download the `1.2.0` version
+
 
 In VS Code:
 
